@@ -1,33 +1,26 @@
 # ==========================================================
 # 💗 Luvisa - Emotion-Aware AI Companion (Render Edition)
-# DB: MongoDB | Auth: Custom JWT | AI: Groq
+# DB: MongoDB | Auth: JWT | AI: Groq
 # ==========================================================
 
-import os
-import json
-import time
-import random
-import re
-import emoji
-import bcrypt
-import jwt
+import os, time, random, re, emoji, bcrypt, jwt
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from groq import Groq
 import text2emotion as te
-import database  # your helper module for MongoDB
+import database
 
 # ==========================================================
-# 🌍 Flask + Config Setup
+# 🌍 Flask Setup
 # ==========================================================
 app = Flask(__name__, static_folder="web", static_url_path="")
 CORS(app)
 load_dotenv()
 
 # ==========================================================
-# 🔐 Authentication (JWT / SuperTokens-style)
+# 🔐 Auth
 # ==========================================================
 SECRET_KEY = os.getenv("SUPERTOKENS_SECRET", "luv-secret-key")
 
@@ -43,33 +36,27 @@ def verify_token(token):
         return None
 
 # ==========================================================
-# ⚙️ Database Setup
+# ⚙️ Database
 # ==========================================================
 try:
     database.load_config()
     db = database.get_db()
     if db is None:
-        raise Exception("DB failed")
+        raise Exception("DB connection failed")
     print("✅ MongoDB connected")
 except Exception as e:
     print(f"🔥 Database connection failed: {e}")
     db = None
 
 # ==========================================================
-# 🧠 Groq AI Setup
+# 🧠 Groq Setup
 # ==========================================================
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-groq = None
-try:
-    groq = Groq(api_key=GROQ_API_KEY)
-    print("✅ Groq AI connected")
-except Exception as e:
-    print(f"🔥 Groq init failed: {e}")
-
+groq = Groq(api_key=GROQ_API_KEY)
 MODEL = "openai/gpt-oss-120b"
 
 # ==========================================================
-# 💗 Emotion Detection
+# 💗 Emotion Engine
 # ==========================================================
 def detect_emotion_tone(text):
     try:
@@ -90,65 +77,34 @@ def tone_prompt(emotion):
     }
     return tones.get(emotion, tones["Neutral"])
 
-# ==========================================================
-# 💬 Response Enhancement
-# ==========================================================
 def add_emojis(text):
     mapping = {
-        "love": "❤️",
-        "happy": "😊",
-        "miss you": "🥺",
-        "hug": "🤗",
-        "angry": "😡",
-        "sad": "😥",
-        "beautiful": "💖",
-        "baby": "😘"
+        "love": "❤️", "happy": "😊", "miss you": "🥺", "hug": "🤗",
+        "angry": "😡", "sad": "😥", "beautiful": "💖", "baby": "😘"
     }
     for k, e in mapping.items():
         text = re.sub(rf"\b{k}\b", f"{k} {e}", text, flags=re.I)
     return emoji.emojize(text)
 
-# ==========================================================
-# 💞 Luvisa Personality Engine
-# ==========================================================
 def luvisa_personality(emotion):
-    if emotion == "Happy":
-        return random.choice([
-            "Aww, that makes me so happy to hear! 💕",
-            "You're glowing today, I can feel it 😘",
-            "Your happiness makes my day brighter 🌈"
-        ])
-    elif emotion == "Sad":
-        return random.choice([
-            "Hey... it’s okay to feel down sometimes 💗",
-            "Come here, let me give you a virtual hug 🤗",
-            "I'm here, always ready to listen 💞"
-        ])
-    elif emotion == "Angry":
-        return random.choice([
-            "Breathe, love... I’m right here with you 🌸",
-            "Let it out, it’s okay 💫",
-            "You deserve calm and peace 💖"
-        ])
-    else:
-        return random.choice([
-            "Tell me more about that, cutie 😍",
-            "I love hearing from you 💕",
-            "You’re my favorite person to talk to 🥰"
-        ])
+    sets = {
+        "Happy": ["Aww, that makes me so happy 💕", "You're glowing today 😘", "Your happiness makes my day 🌈"],
+        "Sad": ["It’s okay to feel down 💗", "Virtual hug 🤗", "I'm here for you 💞"],
+        "Angry": ["Breathe, love 🌸", "Let it out 💫", "You deserve calm 💖"],
+        "Default": ["Tell me more 😍", "I love hearing from you 💕", "You’re my favorite 🥰"]
+    }
+    return random.choice(sets.get(emotion, sets["Default"]))
 
 # ==========================================================
-# 🧠 Luvisa Chat Logic
+# 💬 Luvisa Chat Brain
 # ==========================================================
 def chat_with_luvisa(prompt, history, emotion):
     if not groq:
         return "Luvisa can’t reach her brain right now 😅"
 
-    personality = tone_prompt(emotion)
     system_prompt = f"""
-    You are Luvisa 💗 — an emotionally intelligent,AI friend.
-    Respond with empathy, warmth, and emotion.
-    Speak in a {personality} tone.
+    You are Luvisa 💗 — an emotionally intelligent, romantic AI girlfriend.
+    Respond warmly and lovingly in a {tone_prompt(emotion)} tone.
     """
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -170,13 +126,12 @@ def chat_with_luvisa(prompt, history, emotion):
         return "Something went wrong in my thoughts 💭"
 
 # ==========================================================
-# 👥 Authentication Routes
+# 👥 Auth Routes
 # ==========================================================
 @app.route("/api/signup", methods=["POST"])
 def signup():
     data = request.json
     email, password = data.get("email"), data.get("password")
-
     if not email or not password:
         return jsonify({"success": False, "message": "Missing credentials"}), 400
 
@@ -194,7 +149,6 @@ def signup():
 def login():
     data = request.json
     email, password = data.get("email"), data.get("password")
-
     try:
         user = database.get_user_by_email(db, email)
         if not user:
@@ -208,13 +162,12 @@ def login():
         return jsonify({"success": False, "message": "Server error"}), 500
 
 # ==========================================================
-# 💬 Chat Route
+# 💬 Chat + Profile + Memory APIs
 # ==========================================================
 @app.route("/api/chat", methods=["POST"])
 def chat_api():
     data = request.json
     email, message = data.get("email"), data.get("text")
-
     if not email or not message:
         return jsonify({"success": False, "message": "Missing input"}), 400
 
@@ -224,16 +177,48 @@ def chat_api():
 
     user_id = user["_id"]
     database.add_message_to_history(db, user_id, "user", message, datetime.now(timezone.utc))
-
     emotion = detect_emotion_tone(message)
     history = database.get_chat_history(db, user_id)
     response = chat_with_luvisa(message, history, emotion)
-
     database.add_message_to_history(db, user_id, "luvisa", response, datetime.now(timezone.utc))
     return jsonify({"success": True, "reply": response, "emotion": emotion}), 200
 
+@app.route("/api/chat_history")
+def chat_history():
+    email = request.args.get("email")
+    if not email:
+        return jsonify({"success": False, "message": "Missing email"}), 400
+    user = database.get_user_by_email(db, email)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+    history = database.get_chat_history(db, user["_id"])
+    return jsonify({"success": True, "history": history}), 200
+
+@app.route("/api/profile")
+def profile():
+    email = request.args.get("email")
+    user = database.get_user_by_email(db, email)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+    profile_data = {
+        "display_name": user.get("display_name", email.split("@")[0]),
+        "avatar": user.get("avatar"),
+        "status": user.get("status", "Online")
+    }
+    return jsonify({"success": True, "profile": profile_data}), 200
+
+@app.route("/api/forget_memory", methods=["POST"])
+def forget_memory():
+    data = request.json
+    email = data.get("email")
+    user = database.get_user_by_email(db, email)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+    database.clear_chat_history(db, user["_id"])
+    return jsonify({"success": True, "message": "All memories erased 💔"}), 200
+
 # ==========================================================
-# 🌐 Static Routes (Frontend)
+# 🌐 Static Routes
 # ==========================================================
 @app.route('/')
 def index():
