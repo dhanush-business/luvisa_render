@@ -29,9 +29,7 @@ load_dotenv()
 # ==========================================================
 # 🔐 Authentication (JWT / SuperTokens-style)
 # ==========================================================
-SECRET_KEY = os.getenv("SUPERTOKENS_API_KEY", "luv-secret-key")
-SUPERTOKENS_URI = os.getenv("SUPERTOKENS_CONNECTION_URI")
-
+SECRET_KEY = os.getenv("SUPERTOKENS_SECRET", "luv-secret-key")
 
 def create_token(email):
     payload = {"email": email, "iat": int(time.time())}
@@ -111,7 +109,7 @@ def add_emojis(text):
     return emoji.emojize(text)
 
 # ==========================================================
-# 💞 Luvisa AI Personality Engine
+# 💞 Luvisa Personality Engine
 # ==========================================================
 def luvisa_personality(emotion):
     if emotion == "Happy":
@@ -148,7 +146,7 @@ def chat_with_luvisa(prompt, history, emotion):
 
     personality = tone_prompt(emotion)
     system_prompt = f"""
-    You are Luvisa 💗 — an emotionally intelligent, romantic AI girlfriend.
+    You are Luvisa 💗 — an emotionally intelligent,AI friend.
     Respond with empathy, warmth, and emotion.
     Speak in a {personality} tone.
     """
@@ -241,6 +239,10 @@ def chat_api():
 def index():
     return send_from_directory(app.static_folder, 'login.html')
 
+@app.route('/chat')
+def chat_page():
+    return send_from_directory(app.static_folder, 'index.html')
+
 @app.route('/<path:path>')
 def serve_static(path):
     return send_from_directory(app.static_folder, path)
@@ -249,4 +251,5 @@ def serve_static(path):
 # 🚀 Render Entry
 # ==========================================================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
