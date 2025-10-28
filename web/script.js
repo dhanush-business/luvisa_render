@@ -1,5 +1,5 @@
 // --- Backend URL ---
-const BACKEND_URL = ''; // Relative path
+const BACKEND_URL = 'https://luvisa-render.onrender.com'; // Relative path
 
 // --- Default Avatar Path ---
 const DEFAULT_AVATAR_STATIC_PATH = "/avatars/default_avatar.png";
@@ -318,4 +318,5 @@ async function sendMessage() {
     }
 
 }
+
 
