@@ -1,5 +1,5 @@
 // --- NEW: Define Backend URL ---
-const BACKEND_URL = ''; // Use relative path
+const BACKEND_URL = 'https://luvisa-render.onrender.com'; // Use relative path
 
 document.addEventListener("DOMContentLoaded", () => {
     handleAutoLogin(); // Runs automatically
@@ -164,5 +164,6 @@ async function signupUser() {
     }
 
 }
+
 
 
