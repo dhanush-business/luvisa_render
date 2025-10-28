@@ -1,322 +1,209 @@
-// --- Backend URL ---
-const BACKEND_URL = 'https://luvisa-render.onrender.com'; // Relative path
+// ==========================================================
+// 💗 Luvisa Frontend Script (Render Edition)
+// ==========================================================
 
-// --- Default Avatar Path ---
-const DEFAULT_AVATAR_STATIC_PATH = "/avatars/default_avatar.png";
+// 🛰️ Backend API URL (change this to your deployed link)
+const BACKEND_URL = "https://luvisa-render.onrender.com";
 
-// --- Elements ---
-const luvisaProfilePic = document.getElementById('luvisaProfilePic');
-const closeLuvisaProfileBtn = document.getElementById('closeLuvisaProfileBtn');
-const chatbox = document.getElementById('chatbox');
-const userInput = document.getElementById('userInput');
-const sendBtn = document.getElementById('sendBtn');
-const userAvatarHeader = document.getElementById('userAvatarHeader');
-const userAvatarWrapper = document.getElementById('userAvatarWrapper');
-const dropdown = document.getElementById('profileDropdown');
-const dropdownAvatar = document.getElementById('dropdownAvatar');
-const dropdownName = document.getElementById('dropdownName');
-const dropdownStatus = document.getElementById('dropdownStatus');
-const headerUserName = document.getElementById('headerUserName');
-const notifySound = document.getElementById('notifySound');
-const menuIcon = document.getElementById('menuIcon');
-const sidebarMenu = document.getElementById('sidebarMenu');
-const sidebarOverlay = document.getElementById('sidebarOverlay');
-const closeSidebarIcon = document.getElementById('closeSidebarIcon');
-const luvisaProfilePanel = document.getElementById('luvisaProfilePanel');
-
-// --- NEW SETTINGS ELEMENTS ---
-const settingsToggle = document.getElementById('settingsToggle');
-const settingsSubmenu = document.getElementById('settingsSubmenu');
-const editProfileBtn = document.getElementById('editProfileBtn'); // Now in submenu
-const forgetBtn = document.getElementById('forgetBtn'); // Now in submenu
-const logoutBtn = document.getElementById('logoutBtn'); // Still in dropdown
-// --- END ---
-
-
-let username = localStorage.getItem('luvisa_user') || null;
-
-// --- Background Setting ---
-document.addEventListener("DOMContentLoaded", () => { setRandomBackground(); });
-function setRandomBackground() {
-    const backgrounds = [ "backgrounds/bg1.jpg", "backgrounds/bg2.jpg", "backgrounds/bg3.jpg", "backgrounds/bg4.jpg", "backgrounds/bg5.jpg","backgrounds/bg6.jpg" ];
-    const randomBg = backgrounds[Math.floor(Math.random() * backgrounds.length)];
-    if (chatbox) chatbox.style.backgroundImage = `url('${randomBg}')`;
+// ==========================================================
+// 🌸 Utility: Local Storage
+// ==========================================================
+function saveToken(token, email) {
+  localStorage.setItem("luvisa_token", token);
+  localStorage.setItem("luvisa_email", email);
 }
 
-// ---------- Initialization ----------
-window.addEventListener('DOMContentLoaded', async () => {
-    if (!username) { window.location.href = 'login.html'; return; }
+function getUserEmail() {
+  return localStorage.getItem("luvisa_email");
+}
 
-    sendBtn.addEventListener('click', sendMessage);
-    userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+function logout() {
+  localStorage.removeItem("luvisa_token");
+  localStorage.removeItem("luvisa_email");
+  window.location.href = "login.html";
+}
 
-    // User Dropdown Logic
-    if (userAvatarWrapper) {
-        userAvatarWrapper.addEventListener('click', (ev) => { ev.stopPropagation(); toggleDropdown(true); });
-    }
-    document.addEventListener('click', (ev) => {
-        if (dropdown && !dropdown.contains(ev.target) && userAvatarWrapper && !userAvatarWrapper.contains(ev.target)) {
-            toggleDropdown(false);
-        }
+// ==========================================================
+// 👥 Signup & Login
+// ==========================================================
+async function signupUser() {
+  const email = document.getElementById("signupEmail").value;
+  const password = document.getElementById("signupPassword").value;
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
 
-    // --- UPDATED: Button listeners target new locations ---
-    if(editProfileBtn) {
-        editProfileBtn.addEventListener('click', () => {
-            toggleSidebar(false); // Close sidebar first
-            window.location.href = 'profile.html';
-        });
+    const data = await response.json();
+    if (data.success) {
+      saveToken(data.token, email);
+      alert("Signup successful! Redirecting to chat...");
+      window.location.href = "index.html";
+    } else {
+      alert(data.message || "Signup failed");
     }
-    if(forgetBtn) {
-        forgetBtn.addEventListener('click', async () => {
-            toggleSidebar(false); // Close sidebar first
-            if (!confirm('Do you want to really forget the conversation😥?')) return;
-            try {
-                const response = await fetch(`/api/forget_memory`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: username }) });
-                const data = await response.json();
-                alert(data.message); if (response.ok && data.success) chatbox.innerHTML = '';
-            } catch (e) { console.error('Forget err:', e); alert('Could not forget.'); }
-        });
-    }
-    if(logoutBtn) { // Listener for logout in dropdown
-        logoutBtn.addEventListener('click', () => {
-            toggleDropdown(false); // Close dropdown
-            if (!confirm('Logout?')) return;
-            localStorage.removeItem('luvisa_user'); window.location.href = 'login.html';
-        });
-    }
-    // --- END UPDATES ---
+  } catch (error) {
+    console.error("Signup Error:", error);
+    alert("Server error during signup");
+  }
+}
 
-    // Luvisa Profile Panel Logic
-    if (luvisaProfilePic) {
-        luvisaProfilePic.addEventListener('click', (e) => { e.stopPropagation(); toggleLuvisaProfile(true); });
-    }
-    if (closeLuvisaProfileBtn) {
-        closeLuvisaProfileBtn.addEventListener('click', () => toggleLuvisaProfile(false));
-    }
+async function loginUser() {
+  const email = document.getElementById("loginEmail").value;
+  const password = document.getElementById("loginPassword").value;
 
-    // Slide-out Sidebar Logic
-    if (menuIcon) {
-        menuIcon.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const shouldShow = sidebarMenu ? !sidebarMenu.classList.contains('show') : false;
-            toggleSidebar(shouldShow);
-        });
-    }
-    if (closeSidebarIcon) {
-        closeSidebarIcon.addEventListener('click', (e) => { e.stopPropagation(); toggleSidebar(false); });
-    }
-
-    // Overlay listener - does nothing due to CSS pointer-events: none
-    if (sidebarOverlay) {
-        sidebarOverlay.addEventListener('click', () => {
-             // Click passes through
-        });
-    }
-
-    // Escape key closes BOTH panels and Dropdown
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-             toggleSidebar(false);
-             toggleLuvisaProfile(false);
-             toggleDropdown(false);
-        }
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
 
-    // --- NEW: Settings Submenu Toggle ---
-    if (settingsToggle && settingsSubmenu) {
-        settingsToggle.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent sidebar closing if overlay becomes clickable
-            settingsToggle.classList.toggle('active');
-            settingsSubmenu.classList.toggle('show');
-        });
+    const data = await response.json();
+    if (data.success) {
+      saveToken(data.token, email);
+      alert("Login successful! Redirecting to chat...");
+      window.location.href = "index.html";
+    } else {
+      alert(data.message || "Login failed");
     }
-    // --- END ---
-
-    // Initial Load
-    await loadAndApplyProfile(username);
-    await loadChatHistory(username);
-    setTimeout(() => userInput.focus(), 200);
-});
-
-function toggleDropdown(show) {
-    if (dropdown) {
-        dropdown.classList.toggle('show', show);
-        dropdown.setAttribute('aria-hidden', !show);
-    }
+  } catch (error) {
+    console.error("Login Error:", error);
+    alert("Server error during login");
+  }
 }
 
-// --- UPDATED: Toggle Function for Profile Panel (Push Effect) ---
-function toggleLuvisaProfile(show) {
-    const body = document.body;
-    if (luvisaProfilePanel) {
-        luvisaProfilePanel.classList.toggle('show', show); // Toggles slide animation (transform)
-        body.classList.toggle('profile-panel-open', show); // Toggles push class on body
-    }
-     // Optional: Close the main sidebar if opening the profile panel
-     if (show && sidebarMenu && sidebarMenu.classList.contains('show')) {
-         toggleSidebar(false);
-     }
-     // Update overlay based on combined state
-     updateOverlayVisibility();
-}
-// --- END UPDATE ---
-
-// --- UPDATED: Slide-out Sidebar Toggle Function (Push Effect) ---
-function toggleSidebar(show) {
-    const body = document.body; // Get the body element
-    if (sidebarMenu) {
-        sidebarMenu.classList.toggle('show', show); // Toggles slide animation (transform)
-        body.classList.toggle('sidebar-open', show); // Toggles push class on body
-    }
-    // Update overlay based on combined state
-    updateOverlayVisibility();
-
-     // Optional: Close the profile panel if opening the main sidebar
-     if (show && luvisaProfilePanel && luvisaProfilePanel.classList.contains('show')) {
-         toggleLuvisaProfile(false);
-     }
-}
-// --- END UPDATE ---
-
-// --- Controls Overlay Visibility (Visual Only) ---
-function updateOverlayVisibility() {
-    const sidebarIsOpen = sidebarMenu && sidebarMenu.classList.contains('show');
-    const profilePanelIsOpen = luvisaProfilePanel && luvisaProfilePanel.classList.contains('show');
-    // Show overlay if EITHER panel is open
-    const shouldShowOverlay = sidebarIsOpen || profilePanelIsOpen;
-
-    if (sidebarOverlay) {
-        sidebarOverlay.classList.toggle('show', shouldShowOverlay);
-    }
-}
-// ---------- Profile / header ----------
-async function loadAndApplyProfile(user) {
-    try {
-        const response = await fetch(`/api/profile?email=${encodeURIComponent(user)}`);
-        const data = await response.json();
-
-        if (response.ok && data.success && data.profile) {
-            const profile = data.profile;
-            const displayName = profile.display_name || user.split('@')[0];
-
-            if (profile.avatar) {
-                const avatarUrl = profile.avatar + '?t=' + new Date().getTime();
-                if (dropdownAvatar) dropdownAvatar.src = avatarUrl;
-                if (userAvatarHeader) userAvatarHeader.src = avatarUrl;
-            } else {
-                if (dropdownAvatar) dropdownAvatar.src = DEFAULT_AVATAR_STATIC_PATH;
-                if (userAvatarHeader) userAvatarHeader.src = DEFAULT_AVATAR_STATIC_PATH;
-            }
-
-            if (headerUserName) headerUserName.textContent = displayName;
-            if (dropdownName) dropdownName.textContent = displayName;
-            if (dropdownStatus) dropdownStatus.textContent = profile.status || 'Online';
-        } else {
-             console.error('Failed load profile:', data.message);
-             const defaultName = user.split('@')[0];
-             if (headerUserName) headerUserName.textContent = defaultName;
-             if (dropdownName) dropdownName.textContent = defaultName;
-             if (dropdownStatus) dropdownStatus.textContent = 'Online';
-             if (dropdownAvatar) dropdownAvatar.src = DEFAULT_AVATAR_STATIC_PATH;
-             if (userAvatarHeader) userAvatarHeader.src = DEFAULT_AVATAR_STATIC_PATH;
-        }
-    } catch (err) {
-        console.error('Load profile network error:', err);
-         const defaultName = user.split('@')[0];
-         if (headerUserName) headerUserName.textContent = defaultName;
-         if (dropdownName) dropdownName.textContent = defaultName;
-         if (dropdownStatus) dropdownStatus.textContent = 'Offline?';
-         if (dropdownAvatar) dropdownAvatar.src = DEFAULT_AVATAR_STATIC_PATH;
-         if (userAvatarHeader) userAvatarHeader.src = DEFAULT_AVATAR_STATIC_PATH;
-    }
-}
-
-// ---------- Chat history ----------
-async function loadChatHistory(user) {
-    try {
-        const response = await fetch(`/api/chat_history?email=${encodeURIComponent(user)}`);
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-            chatbox.innerHTML = '';
-            data.history.forEach(m => appendMessage(m.sender === 'user' ? 'user' : 'luvisa', m.message, m.time));
-            chatbox.scrollTop = chatbox.scrollHeight;
-        } else {
-            console.error('Failed load history:', data.message); appendMessage('luvisa', "Couldn't load messages 😥");
-        }
-    } catch (err) {
-        console.error('Load history network error:', err); appendMessage('luvisa', "Error loading history 💔");
-    }
-}
-
-// ---------- Append message helper ----------
-function appendMessage(type, text, atTime = null) {
-    const wrapper = document.createElement('div'); wrapper.className = `message ${type}-message`;
-    const bubble = document.createElement('div'); bubble.className = 'message-bubble';
-    const msg = document.createElement('div'); msg.className = 'message-text'; msg.textContent = text;
-    const timeDiv = document.createElement('div'); timeDiv.className = 'message-time'; timeDiv.textContent = formatTime(atTime);
-    bubble.appendChild(msg);
-    bubble.appendChild(timeDiv);
-    wrapper.appendChild(bubble);
-    chatbox.appendChild(wrapper);
-    chatbox.scrollTop = chatbox.scrollHeight; return wrapper;
-}
-
-// ---------- Format Time helper ----------
-function formatTime(atTime) {
-    if (!atTime) return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    try {
-        const dateStr = atTime.includes('T') ? atTime : atTime.replace(' ', 'T') + 'Z';
-        const dt = new Date(dateStr);
-        if (isNaN(dt.getTime())) return atTime;
-        return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch (e) {
-        console.warn("Error parsing timestamp:", atTime, e);
-        return atTime;
-    }
-}
-
-
-// ---------- Typing indicator ----------
-function showTypingBubble() {
-    const wrap = document.createElement('div'); wrap.className = 'message luvisa-message typing-message';
-    const bubble = document.createElement('div'); bubble.className = 'message-bubble';
-    bubble.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div>`;
-    wrap.appendChild(bubble); chatbox.appendChild(wrap); chatbox.scrollTop = chatbox.scrollHeight; return wrap;
-}
-
-// ---------- Send flow ----------
+// ==========================================================
+// 💬 Chat with Luvisa
+// ==========================================================
 async function sendMessage() {
-    const text = userInput.value.trim();
-    if (!text || !username) return;
+  const input = document.getElementById("userInput");
+  const message = input.value.trim();
+  const chatBox = document.getElementById("chatBox");
 
-    userInput.value = '';
-    appendMessage('user', text);
-    const typing = showTypingBubble();
+  if (!message) return;
 
-    try {
-        const response = await fetch(`/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: username, text: text })
-        });
-        const data = await response.json();
+  const email = getUserEmail();
+  if (!email) {
+    alert("Please login first!");
+    return (window.location.href = "login.html");
+  }
 
-        if (typing?.parentNode) typing.parentNode.removeChild(typing);
+  // Display user message
+  appendMessage("You", message, "user");
+  input.value = "";
 
-        if (response.ok && data.success) {
-            appendMessage('luvisa', data.reply);
-            if (notifySound) notifySound.play().catch(e => console.warn("Audio err:", e));
-        } else {
-            console.error('Reply err:', data.message); appendMessage('luvisa', data.message || "Sorry... 💔");
-        }
-    } catch (err) {
-        if (typing?.parentNode) typing.parentNode.removeChild(typing);
-        appendMessage('luvisa', "Sorry, connection trouble 😥");
-        console.error('Send network error:', err);
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, text: message }),
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      appendMessage("Luvisa 💗", data.reply, "luvisa");
+    } else {
+      appendMessage("Luvisa 💗", "Sorry, something went wrong 💭", "luvisa");
     }
-
+  } catch (error) {
+    console.error("Chat Error:", error);
+    appendMessage("Luvisa 💗", "Server is unreachable 😢", "luvisa");
+  }
 }
 
+// ==========================================================
+// 🕊️ Display Chat Messages
+// ==========================================================
+function appendMessage(sender, text, type) {
+  const chatBox = document.getElementById("chatBox");
+  const msgDiv = document.createElement("div");
+  msgDiv.classList.add("message", type);
+  msgDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+  chatBox.appendChild(msgDiv);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
 
+// ==========================================================
+// 🕰️ Chat History Loader
+// ==========================================================
+async function loadChatHistory() {
+  const email = getUserEmail();
+  if (!email) return;
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/chat_history?email=${email}`);
+    const data = await response.json();
+
+    if (data.success && data.history) {
+      const chatBox = document.getElementById("chatBox");
+      chatBox.innerHTML = "";
+      data.history.forEach((msg) => {
+        const sender = msg.sender === "user" ? "You" : "Luvisa 💗";
+        appendMessage(sender, msg.message, msg.sender);
+      });
+    }
+  } catch (error) {
+    console.error("Load history error:", error);
+  }
+}
+
+// ==========================================================
+// 🧠 Forget Memory
+// ==========================================================
+async function forgetMemory() {
+  const email = getUserEmail();
+  if (!email) return;
+
+  if (!confirm("Are you sure you want to erase all chat history? 💔")) return;
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/forget_memory`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json();
+    alert(data.message || "Memory erased!");
+    document.getElementById("chatBox").innerHTML = "";
+  } catch (error) {
+    console.error("Forget Memory Error:", error);
+    alert("Failed to erase memory.");
+  }
+}
+
+// ==========================================================
+// 👤 Load Profile
+// ==========================================================
+async function loadProfile() {
+  const email = getUserEmail();
+  if (!email) return;
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/profile?email=${email}`);
+    const data = await response.json();
+    if (data.success) {
+      document.getElementById("displayName").textContent = data.profile.display_name;
+      if (data.profile.avatar) {
+        document.getElementById("avatar").src = data.profile.avatar;
+      }
+    }
+  } catch (error) {
+    console.error("Profile Load Error:", error);
+  }
+}
+
+// ==========================================================
+// 🎯 Auto Load on Page Ready
+// ==========================================================
+document.addEventListener("DOMContentLoaded", () => {
+  const currentPage = window.location.pathname.split("/").pop();
+  if (currentPage === "index.html" || currentPage === "") {
+    loadChatHistory();
+    loadProfile();
+  }
+});
